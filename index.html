@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>seth's focus beats</title>
+<script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
+<style>
+  /* ───── theme variables ───── */
+  :root {
+    --bg: #0a0612;
+    --ink: #f4ecff;
+    --dim: #9b86c4;
+    --hot: #ff5fa2;
+    --cool: #5fe1ff;
+    --acid: #c5ff5f;
+    --card-bg: rgba(255,255,255,0.04);
+    --card-bg-2: rgba(255,255,255,0.03);
+    --card-border: rgba(255,255,255,0.08);
+    --card-border-2: rgba(255,255,255,0.06);
+    --line: rgba(255,255,255,0.10);
+    --line-2: rgba(255,255,255,0.15);
+    --bg-grad-1: #2a0d4d;
+    --bg-grad-2: #0d3d4d;
+    --cell-empty: rgba(255,255,255,0.045);
+    --cell-1: rgba(95,225,255,0.20);
+    --cell-2: rgba(95,225,255,0.40);
+    --cell-3: rgba(95,225,255,0.65);
+    --cell-4: rgba(95,225,255,0.92);
+  }
+  [data-theme="light"] {
+    --bg: #f6f2fc;
+    --ink: #1a0e2e;
+    --dim: #6b5d8c;
+    --hot: #c93878;
+    --cool: #1c8fb5;
+    --acid: #6ea018;
+    --card-bg: rgba(0,0,0,0.04);
+    --card-bg-2: rgba(0,0,0,0.025);
+    --card-border: rgba(0,0,0,0.09);
+    --card-border-2: rgba(0,0,0,0.06);
+    --line: rgba(0,0,0,0.1);
+    --line-2: rgba(0,0,0,0.15);
+    --bg-grad-1: #e6d8f4;
+    --bg-grad-2: #d4ecf2;
+    --cell-empty: rgba(0,0,0,0.055);
+    --cell-1: rgba(28,143,181,0.22);
+    --cell-2: rgba(28,143,181,0.45);
+    --cell-3: rgba(28,143,181,0.7);
+    --cell-4: rgba(28,143,181,0.95);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background:
+      radial-gradient(1200px 800px at 20% 10%, var(--bg-grad-1) 0%, transparent 60%),
+      radial-gradient(900px 700px at 90% 90%, var(--bg-grad-2) 0%, transparent 55%),
+      var(--bg);
+    color: var(--ink);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    min-height: 100%;
+    overflow: hidden;
+    user-select: none;
+    transition: background-color 0.3s, color 0.3s;
+  }
+  .stage {
+    position: fixed; inset: 0;
+    display: grid; grid-template-rows: auto 1fr auto;
+    padding: 24px 32px;
+  }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    letter-spacing: 0.02em;
+  }
+  h1 { font-size: 18px; font-weight: 600; margin: 0; color: var(--ink); }
+  h1 .dot { color: var(--hot); }
+  .header-right { display: flex; align-items: center; gap: 14px; }
+  header .meta { font-size: 11px; color: var(--dim); }
+  .theme-toggle {
+    appearance: none; cursor: pointer; background: transparent;
+    border: 1px solid var(--card-border); color: var(--dim);
+    width: 28px; height: 28px; border-radius: 50%;
+    font-size: 13px; padding: 0; line-height: 1;
+    transition: all 0.2s;
+  }
+  .theme-toggle:hover { color: var(--ink); border-color: var(--cool); }
+
+  main {
+    display: grid; grid-template-columns: 1fr 380px;
+    gap: 28px; align-items: stretch; min-height: 0;
+    padding: 16px 0;
+  }
+  .vis {
+    position: relative; border-radius: 24px; overflow: hidden;
+    background: linear-gradient(160deg, rgba(255,95,162,0.05), rgba(95,225,255,0.04));
+    border: 1px solid var(--card-border-2); min-height: 0;
+  }
+  canvas { width: 100%; height: 100%; display: block; }
+
+  .panel {
+    display: flex; flex-direction: column; gap: 12px;
+    overflow-y: auto; padding-right: 4px;
+  }
+  .panel::-webkit-scrollbar { width: 4px; }
+  .panel::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
+
+  .now {
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: 14px; padding: 14px 16px;
+    display: grid; gap: 6px;
+  }
+  .now .top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .station-name { font-size: 15px; font-weight: 600; color: var(--ink); }
+  .now-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .track-block { min-height: 36px; }
+  .track-title { font-size: 13px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .track-artist { font-size: 11px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .genre { font-size: 9px; color: var(--dim); letter-spacing: 0.1em; text-transform: uppercase; }
+
+  .icon-btn {
+    appearance: none; cursor: pointer;
+    background: transparent; border: 1px solid var(--line-2);
+    color: var(--ink); font-family: inherit; font-size: 11px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 5px 9px; border-radius: 6px;
+    transition: all 0.15s; display: inline-flex; align-items: center; gap: 4px;
+  }
+  .icon-btn:hover:not(:disabled) { border-color: var(--hot); color: var(--hot); }
+  .icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .icon-btn.dislike:hover:not(:disabled) { border-color: var(--hot); color: var(--hot); }
+
+  .play {
+    appearance: none; border: 0; cursor: pointer;
+    background: linear-gradient(135deg, var(--hot), var(--cool));
+    color: #0a0612; font-family: inherit; font-weight: 700; font-size: 16px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 18px; border-radius: 14px;
+    transition: transform 0.1s, filter 0.2s;
+    box-shadow: 0 12px 40px -10px rgba(255,95,162,0.4);
+  }
+  .play:hover { filter: brightness(1.1); }
+  .play:active { transform: scale(0.98); }
+  .play.playing {
+    background: linear-gradient(135deg, #2a1450, #0d3d4d);
+    color: var(--ink);
+    box-shadow: 0 0 0 1px var(--card-border), 0 12px 40px -16px rgba(0,0,0,0.6);
+  }
+  [data-theme="light"] .play.playing {
+    background: linear-gradient(135deg, #d8c4ec, #c4e4ec);
+    color: var(--ink);
+  }
+
+  .modes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+  .mode {
+    appearance: none; cursor: pointer;
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    color: var(--dim); padding: 8px 4px; border-radius: 9px;
+    font-family: inherit; font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase;
+    transition: all 0.15s;
+  }
+  .mode:hover { color: var(--ink); }
+  .mode.active {
+    background: rgba(255,95,162,0.15); border-color: var(--hot); color: var(--ink);
+  }
+  .mode small { display: block; opacity: 0.55; font-size: 7px; margin-top: 2px; letter-spacing: 0.04em; }
+
+  .stations { display: flex; gap: 5px; }
+  .station {
+    flex: 1; appearance: none; cursor: pointer;
+    background: var(--card-bg-2); border: 1px solid var(--card-border-2);
+    color: var(--dim); padding: 8px 4px; border-radius: 7px;
+    font-family: inherit; font-size: 9px; letter-spacing: 0.04em;
+    transition: all 0.15s; text-align: center;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+  }
+  .station:hover { color: var(--ink); }
+  .station.active {
+    background: rgba(95,225,255,0.10); border-color: var(--cool); color: var(--ink);
+  }
+  .fav-star { color: var(--acid); font-size: 9px; }
+
+  .masters { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .master {
+    background: var(--card-bg-2); border: 1px solid var(--card-border-2);
+    border-radius: 10px; padding: 10px 12px;
+    display: grid; gap: 6px;
+  }
+  .master label { font-size: 9px; color: var(--dim); letter-spacing: 0.1em; text-transform: uppercase; }
+  .master .val { font-size: 12px; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .master input[type=range] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 3px;
+    background: var(--line); border-radius: 2px;
+    outline: none; margin: 0;
+  }
+  .master input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--hot); cursor: pointer; box-shadow: 0 0 8px var(--hot);
+  }
+  .master.cool input[type=range]::-webkit-slider-thumb { background: var(--cool); box-shadow: 0 0 8px var(--cool); }
+  .master.acid input[type=range]::-webkit-slider-thumb { background: var(--acid); box-shadow: 0 0 8px var(--acid); }
+
+  .source {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 4px 0; font-size: 10px; color: var(--dim); gap: 8px;
+  }
+  .source a { color: var(--cool); text-decoration: none; }
+  .source a:hover { text-decoration: underline; }
+  .source-actions { display: flex; gap: 6px; }
+  .text-btn {
+    appearance: none; cursor: pointer;
+    background: transparent; border: 1px solid var(--line-2);
+    color: var(--dim); font-family: inherit; font-size: 9px;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 4px 9px; border-radius: 6px;
+    transition: all 0.15s;
+  }
+  .text-btn:hover { color: var(--cool); border-color: var(--cool); }
+
+  footer {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: var(--dim); letter-spacing: 0.06em;
+  }
+  footer .session { font-variant-numeric: tabular-nums; }
+  .pulse {
+    display: inline-block; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--hot);
+    margin-right: 6px; box-shadow: 0 0 10px var(--hot);
+  }
+  .pulse.idle { background: var(--dim); box-shadow: none; }
+  .pulse.loading { background: var(--acid); box-shadow: 0 0 10px var(--acid); animation: blink 0.4s infinite; }
+  @keyframes blink { 50% { opacity: 0.3; } }
+
+  /* ─── stats overlay ─── */
+  .stats-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(10,6,18,0.78);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    display: flex; align-items: center; justify-content: center; padding: 32px;
+  }
+  [data-theme="light"] .stats-overlay { background: rgba(246,242,252,0.82); }
+  .stats-overlay[hidden] { display: none; }
+  .stats-panel {
+    width: 100%; max-width: 980px; max-height: 92vh;
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: 16px; padding: 28px 32px;
+    overflow-y: auto;
+  }
+  .stats-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 22px; gap: 12px; flex-wrap: wrap;
+  }
+  .stats-header h2 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: 0.04em; }
+  .filters { display: flex; gap: 6px; align-items: center; }
+  .filter {
+    appearance: none; cursor: pointer; background: transparent;
+    border: 1px solid var(--line-2); color: var(--dim);
+    padding: 5px 11px; border-radius: 6px;
+    font-family: inherit; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .filter.active { background: var(--card-bg); color: var(--ink); border-color: var(--line-2); }
+  .close {
+    appearance: none; cursor: pointer; background: transparent; border: 0;
+    color: var(--dim); font-size: 22px; padding: 0 6px; line-height: 1;
+    margin-left: 4px;
+  }
+  .close:hover { color: var(--ink); }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .stat-card {
+    background: var(--card-bg-2); border: 1px solid var(--card-border-2);
+    border-radius: 10px; padding: 14px;
+  }
+  .stat-card .label {
+    font-size: 10px; color: var(--dim);
+    letter-spacing: 0.06em; margin-bottom: 6px;
+  }
+  .stat-card .value {
+    font-size: 22px; font-weight: 600; color: var(--ink);
+    font-variant-numeric: tabular-nums; line-height: 1.2;
+  }
+  .stat-card .value.small { font-size: 14px; }
+
+  .heatmap-wrap { margin-top: 20px; }
+  .heatmap-label { font-size: 10px; color: var(--dim); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px; }
+  .heatmap {
+    display: grid; grid-auto-flow: column;
+    grid-template-rows: repeat(7, 1fr);
+    gap: 3px; padding: 4px 0;
+  }
+  .cell {
+    width: 100%; aspect-ratio: 1;
+    background: var(--cell-empty); border-radius: 3px;
+    transition: transform 0.1s;
+  }
+  .cell:hover { transform: scale(1.3); }
+  .cell.c1 { background: var(--cell-1); }
+  .cell.c2 { background: var(--cell-2); }
+  .cell.c3 { background: var(--cell-3); }
+  .cell.c4 { background: var(--cell-4); }
+  .cell.future { visibility: hidden; }
+  .heatmap-legend {
+    display: flex; gap: 6px; align-items: center; justify-content: flex-end;
+    margin-top: 8px; font-size: 10px; color: var(--dim);
+  }
+  .heatmap-legend .cell { width: 12px; height: 12px; }
+
+  .empty-state {
+    text-align: center; color: var(--dim);
+    padding: 40px 20px; font-size: 12px;
+  }
+
+  @media (max-width: 800px) {
+    main { grid-template-columns: 1fr; }
+    .vis { display: none; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <header>
+      <h1>seth's<span class="dot">·</span>focus<span class="dot">·</span>beats</h1>
+      <div class="header-right">
+        <div class="meta" id="meta">human-curated · 16hz · ready</div>
+        <button class="theme-toggle" id="theme-toggle" title="toggle light/dark">☾</button>
+      </div>
+    </header>
+
+    <main>
+      <div class="vis"><canvas id="vis"></canvas></div>
+
+      <div class="panel">
+        <div class="now">
+          <div class="top">
+            <div class="station-name" id="station-name">choose a mode</div>
+            <div class="now-actions">
+              <button class="icon-btn dislike" id="dislike" disabled title="dislike & swap in a new station">👎</button>
+              <button class="icon-btn skip" id="skip" disabled>skip ⇥</button>
+            </div>
+          </div>
+          <div class="track-block">
+            <div class="track-title" id="track-title">—</div>
+            <div class="track-artist" id="track-artist">—</div>
+          </div>
+          <div class="genre" id="genre">press start to begin</div>
+        </div>
+
+        <button class="play" id="play">▶ start session</button>
+
+        <div class="modes" id="modes">
+          <button class="mode active" data-mode="focus">focus<small>16hz · beta</small></button>
+          <button class="mode" data-mode="flow">flow<small>8hz · alpha</small></button>
+          <button class="mode" data-mode="house">house<small>16hz · beta</small></button>
+          <button class="mode" data-mode="energy">energy<small>32hz · gamma</small></button>
+        </div>
+
+        <div class="stations" id="stations"></div>
+
+        <div class="masters">
+          <div class="master cool">
+            <label>focus depth</label>
+            <span class="val" id="depth-val">45%</span>
+            <input type="range" id="depth" min="0" max="80" value="45" />
+          </div>
+          <div class="master acid">
+            <label>volume</label>
+            <span class="val" id="vol-val">60%</span>
+            <input type="range" id="vol" min="0" max="100" value="60" />
+          </div>
+        </div>
+
+        <div class="source">
+          <span>music: <a href="https://somafm.com" target="_blank" rel="noopener">SomaFM</a> · <a href="https://www.radiofrance.fr/fip" target="_blank" rel="noopener">FIP</a> · <a href="https://www.nts.live" target="_blank" rel="noopener">NTS</a></span>
+          <div class="source-actions">
+            <button class="text-btn" id="stats-btn">stats</button>
+            <button class="text-btn" id="reset">↺ reset</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <div><span class="pulse idle" id="pulse"></span><span id="status">awaiting click</span></div>
+      <div class="session" id="session">00:00:00</div>
+    </footer>
+  </div>
+
+  <!-- ───── stats overlay ───── -->
+  <div class="stats-overlay" id="stats-overlay" hidden>
+    <div class="stats-panel">
+      <div class="stats-header">
+        <h2>your focus stats</h2>
+        <div class="filters">
+          <button class="filter active" data-days="0">all</button>
+          <button class="filter" data-days="30">30d</button>
+          <button class="filter" data-days="7">7d</button>
+          <button class="close" id="stats-close">×</button>
+        </div>
+      </div>
+      <div class="stats-grid" id="stats-grid"></div>
+      <div class="heatmap-wrap">
+        <div class="heatmap-label">activity over time</div>
+        <div id="heatmap"></div>
+        <div class="heatmap-legend">
+          less
+          <div class="cell c0"></div>
+          <div class="cell c1"></div>
+          <div class="cell c2"></div>
+          <div class="cell c3"></div>
+          <div class="cell c4"></div>
+          more
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+"use strict";
+
+// ─── stations ──────────────────────────────────────────────────────────────
+const DEFAULT_STATIONS = {
+  focus: [
+    { name: "Mission Control", id: "missioncontrol", url: "https://ice1.somafm.com/missioncontrol-128-mp3", desc: "celestial ambient + nasa transmissions" },
+    { name: "Beat Blender",    id: "beatblender",    url: "https://ice1.somafm.com/beatblender-128-mp3",    desc: "downtempo electronic grooves" },
+    { name: "Cliqhop IDM",     id: "cliqhop",        url: "https://ice1.somafm.com/cliqhop-128-mp3",        desc: "blippy electronic, glitchy IDM" },
+  ],
+  flow: [
+    { name: "Drone Zone",      id: "dronezone",      url: "https://ice1.somafm.com/dronezone-128-mp3",      desc: "atmospheric ambient drone" },
+    { name: "Deep Space One",  id: "deepspaceone",   url: "https://ice1.somafm.com/deepspaceone-128-mp3",   desc: "deep ambient electronic" },
+    { name: "Space Station",   id: "spacestation",   url: "https://ice1.somafm.com/spacestation-128-mp3",   desc: "spaced-out ambient electronica" },
+  ],
+  house: [
+    { name: "The Trip",        id: "thetrip",        url: "https://ice1.somafm.com/thetrip-128-mp3",        desc: "progressive house, trance, late-night cosmic" },
+    { name: "FIP Électro",     id: "fipelectro",     url: "https://icecast.radiofrance.fr/fipelectro-hifi.aac", desc: "techno, deep house, electronic — radio france" },
+    { name: "NTS 1",           id: "nts1",           url: "https://stream-relay-geo.ntslive.net/stream",    desc: "london's underground — techno, house, eclectic" },
+  ],
+  energy: [
+    { name: "Groove Salad",    id: "groovesalad",    url: "https://ice1.somafm.com/groovesalad-128-mp3",    desc: "chilled, ambient grooves" },
+    { name: "Secret Agent",    id: "secretagent",    url: "https://ice1.somafm.com/secretagent-128-mp3",    desc: "spy lounge, bossa, cocktail" },
+    { name: "DEF CON Radio",   id: "defcon",         url: "https://ice1.somafm.com/defcon-128-mp3",         desc: "electronic music for hackers" },
+  ],
+};
+
+// Replacement pool — pulled from when user dislikes a station.
+const BACKUP_STATIONS = {
+  focus: [
+    { name: "Lush",            id: "lush",           url: "https://ice1.somafm.com/lush-128-mp3",           desc: "sensuous, mellow vocals + electronica" },
+    { name: "Sonic Universe",  id: "sonicuniverse",  url: "https://ice1.somafm.com/sonicuniverse-128-mp3",  desc: "transcendental jazz electronica" },
+    { name: "Earwaves",        id: "earwaves",       url: "https://ice1.somafm.com/earwaves-128-mp3",       desc: "experimental electronica" },
+    { name: "Vaporwaves",      id: "vaporwaves",     url: "https://ice1.somafm.com/vaporwaves-128-mp3",     desc: "vaporwave, future-funk, hauntology" },
+  ],
+  flow: [
+    { name: "Suburbs of Goa",  id: "suburbsofgoa",   url: "https://ice1.somafm.com/suburbsofgoa-128-mp3",   desc: "global goa-trance, world ambient" },
+    { name: "Black Rock FM",   id: "brfm",           url: "https://ice1.somafm.com/brfm-128-mp3",           desc: "burning man playa vibes" },
+    { name: "Mystic Soundz",   id: "n5md",           url: "https://ice1.somafm.com/n5md-128-mp3",           desc: "introspective electronic & post-rock" },
+    { name: "ThistleRadio",    id: "thistle",        url: "https://ice1.somafm.com/thistle-128-mp3",        desc: "celtic, acoustic, world-folk" },
+  ],
+  house: [
+    { name: "FIP Groove",      id: "fipgroove",      url: "https://icecast.radiofrance.fr/fipgroove-hifi.aac", desc: "funk, soul, disco grooves" },
+    { name: "NTS 2",           id: "nts2",           url: "https://stream-relay-geo.ntslive.net/stream2",    desc: "more nts — deeper underground" },
+    { name: "Bossa Beyond",    id: "bossa",          url: "https://ice1.somafm.com/bossa-128-mp3",          desc: "lush bossa nova" },
+  ],
+  energy: [
+    { name: "Underground 80s", id: "u80s",           url: "https://ice1.somafm.com/u80s-128-mp3",           desc: "early 80s new wave & post-punk" },
+    { name: "FIP Pop",         id: "fippop",         url: "https://icecast.radiofrance.fr/fippop-hifi.aac", desc: "pop, indie, eclectic — radio france" },
+    { name: "PopTron",         id: "poptron",        url: "https://ice1.somafm.com/poptron-128-mp3",        desc: "electropop & indie dance" },
+  ],
+};
+
+const MODES = {
+  focus:  { freq: 16 },
+  flow:   { freq: 8 },
+  house:  { freq: 16 },
+  energy: { freq: 32 },
+};
+
+// ─── localStorage ──────────────────────────────────────────────────────────
+const LS_PLAYS    = "focusbeats:plays";       // session/play log
+const LS_STATIONS = "focusbeats:stations";    // user's active station list (after dislikes)
+const LS_DISLIKED = "focusbeats:disliked";    // ids of stations the user disliked
+const LS_THEME    = "focusbeats:theme";
+
+function loadJSON(key, fallback) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+  catch { return fallback; }
+}
+function saveJSON(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+
+let plays    = loadJSON(LS_PLAYS, []);
+let STATIONS = loadJSON(LS_STATIONS, null) || JSON.parse(JSON.stringify(DEFAULT_STATIONS));
+let disliked = loadJSON(LS_DISLIKED, []);
+
+// ─── runtime state ─────────────────────────────────────────────────────────
+let mode = "focus";
+let started = false;
+let sessionStart = 0;
+let stationIdx = 0;
+let endTimer = null;
+let metaTimer = null;
+
+// Current play being tracked (for session log)
+let currentSessionId = null;
+let currentPlayStartMs = null;
+let currentPlayMode = null;
+let currentPlayStation = null;
+
+// ─── audio graph ───────────────────────────────────────────────────────────
+let audioCtx, audioEl, mediaSource;
+let masterAM, masterGain, masterSat, masterComp, focusLFO, analyser;
+
+function buildGraph() {
+  audioCtx = Tone.getContext().rawContext;
+  masterComp = new Tone.Compressor({ threshold: -16, ratio: 3, attack: 0.005, release: 0.1, knee: 6 }).toDestination();
+  masterSat = new Tone.Distortion({ distortion: 0.04, wet: 0.10, oversample: "2x" }).connect(masterComp);
+  masterGain = new Tone.Gain(0.6).connect(masterSat);
+  masterAM = new Tone.Gain(1).connect(masterGain);
+  focusLFO = new Tone.LFO({ frequency: MODES[mode].freq, min: 1, max: 1, type: "sine" }).start();
+  focusLFO.connect(masterAM.gain);
+  analyser = new Tone.Analyser("waveform", 256);
+  masterAM.connect(analyser);
+
+  audioEl = new Audio();
+  audioEl.crossOrigin = "anonymous";
+  audioEl.preload = "none";
+  audioEl.addEventListener("playing", () => {
+    statusEl.textContent = "playing";
+    pulse.classList.remove("loading");
+  });
+  audioEl.addEventListener("waiting", () => {
+    statusEl.textContent = "buffering…";
+    pulse.classList.add("loading");
+  });
+  audioEl.addEventListener("error", () => {
+    statusEl.textContent = "stream error — try skip";
+    pulse.classList.remove("loading");
+  });
+  mediaSource = audioCtx.createMediaElementSource(audioEl);
+  mediaSource.connect(masterAM.input);
+}
+
+// ─── session logging ───────────────────────────────────────────────────────
+function startPlayLog(stationName, modeKey) {
+  endPlayLog();
+  currentPlayStartMs = Date.now();
+  currentPlayMode = modeKey;
+  currentPlayStation = stationName;
+}
+function endPlayLog() {
+  if (!currentPlayStartMs) return;
+  const endMs = Date.now();
+  const durationSec = Math.floor((endMs - currentPlayStartMs) / 1000);
+  // Skip very brief plays so accidental clicks don't pollute the log
+  if (durationSec >= 10) {
+    plays.push({
+      id: `${currentPlayStartMs}_${Math.random().toString(36).slice(2,6)}`,
+      sessionId: currentSessionId,
+      mode: currentPlayMode,
+      stationName: currentPlayStation,
+      startMs: currentPlayStartMs,
+      endMs,
+      durationSec,
+    });
+    saveJSON(LS_PLAYS, plays);
+  }
+  currentPlayStartMs = null;
+}
+
+// ─── playback ──────────────────────────────────────────────────────────────
+async function playStation(idx) {
+  const list = STATIONS[mode];
+  if (!list || list.length === 0) {
+    statusEl.textContent = "no stations in this mode";
+    return;
+  }
+  stationIdx = ((idx % list.length) + list.length) % list.length;
+  const s = list[stationIdx];
+
+  audioEl.src = s.url;
+  statusEl.textContent = "loading…";
+  pulse.classList.add("loading");
+
+  try { await audioEl.play(); }
+  catch { statusEl.textContent = "click play to start audio"; pulse.classList.remove("loading"); return; }
+
+  // Log the previous play and start a new one
+  startPlayLog(s.name, mode);
+
+  stationNameEl.textContent = s.name;
+  genreEl.textContent = s.desc;
+  trackTitleEl.textContent = "—";
+  trackArtistEl.textContent = "—";
+  renderStationList();
+  fetchMetadata();
+
+  if (endTimer) clearTimeout(endTimer);
+  const dur = (10 + Math.random() * 5) * 60 * 1000;
+  endTimer = setTimeout(() => skipStation(), dur);
+}
+
+function skipStation() {
+  if (!started) return;
+  playStation(stationIdx + 1);
+}
+
+async function fetchMetadata() {
+  if (!started) return;
+  const s = STATIONS[mode][stationIdx];
+  if (!s) return;
+  if (!s.url.includes("somafm.com")) {
+    trackTitleEl.textContent = "live broadcast";
+    trackArtistEl.textContent = "";
+    return;
+  }
+  try {
+    const res = await fetch(`https://somafm.com/songs/${s.id}.json`, { cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    const cur = data.songs && data.songs[0];
+    if (cur) {
+      trackTitleEl.textContent = cur.title || "—";
+      trackArtistEl.textContent = cur.artist || "—";
+    }
+  } catch {}
+}
+function startMetaPolling() { metaTimer = setInterval(fetchMetadata, 25000); }
+function stopMetaPolling() { if (metaTimer) clearInterval(metaTimer); metaTimer = null; }
+
+// ─── dislike & replace ─────────────────────────────────────────────────────
+function dislikeCurrentStation() {
+  if (!started) return;
+  const list = STATIONS[mode];
+  const removed = list[stationIdx];
+  if (!removed) return;
+
+  // Build the set of station IDs already used across ALL modes so we don't
+  // suggest a station the user already has somewhere else.
+  const usedIds = new Set();
+  for (const m of Object.keys(STATIONS)) {
+    for (const s of STATIONS[m]) usedIds.add(s.id);
+  }
+  // Also exclude anything the user has already disliked.
+  disliked.forEach(id => usedIds.add(id));
+
+  const replacement = (BACKUP_STATIONS[mode] || []).find(s => !usedIds.has(s.id));
+  if (replacement) {
+    list[stationIdx] = replacement;
+  } else {
+    // Pool exhausted — drop the station; if the mode empties, restore defaults
+    list.splice(stationIdx, 1);
+    if (list.length === 0) {
+      STATIONS[mode] = JSON.parse(JSON.stringify(DEFAULT_STATIONS[mode]));
+    }
+  }
+  disliked.push(removed.id);
+  saveJSON(LS_DISLIKED, disliked);
+  saveJSON(LS_STATIONS, STATIONS);
+
+  // Log the play we just ended (so the disliked stretch counts)
+  endPlayLog();
+
+  // Play whatever is now at the same index (or wrap)
+  playStation(Math.min(stationIdx, STATIONS[mode].length - 1));
+}
+
+// ─── DOM ───────────────────────────────────────────────────────────────────
+const playBtn = document.getElementById("play");
+const skipBtn = document.getElementById("skip");
+const dislikeBtn = document.getElementById("dislike");
+const resetBtn = document.getElementById("reset");
+const statsBtn = document.getElementById("stats-btn");
+const statsOverlay = document.getElementById("stats-overlay");
+const statsClose = document.getElementById("stats-close");
+const statsGrid = document.getElementById("stats-grid");
+const heatmapEl = document.getElementById("heatmap");
+const themeToggle = document.getElementById("theme-toggle");
+const modesEl = document.getElementById("modes");
+const stationsEl = document.getElementById("stations");
+const stationNameEl = document.getElementById("station-name");
+const trackTitleEl = document.getElementById("track-title");
+const trackArtistEl = document.getElementById("track-artist");
+const genreEl = document.getElementById("genre");
+const metaEl = document.getElementById("meta");
+const statusEl = document.getElementById("status");
+const pulse = document.getElementById("pulse");
+const sessionEl = document.getElementById("session");
+const depthEl = document.getElementById("depth");
+const depthVal = document.getElementById("depth-val");
+const volEl = document.getElementById("vol");
+const volVal = document.getElementById("vol-val");
+
+const DEFAULTS = { mode: "focus", depth: 45, vol: 60 };
+
+function favoriteStationInMode(modeKey) {
+  const names = STATIONS[modeKey].map(s => s.name);
+  const totals = {};
+  for (const p of plays) {
+    if (names.includes(p.stationName)) {
+      totals[p.stationName] = (totals[p.stationName] || 0) + p.durationSec;
+    }
+  }
+  const top = Object.entries(totals).sort((a, b) => b[1] - a[1])[0];
+  return top ? top[0] : null;
+}
+
+function renderStationList() {
+  const list = STATIONS[mode];
+  const fav = favoriteStationInMode(mode);
+  stationsEl.innerHTML = list.map((s, i) =>
+    `<button class="station${started && i === stationIdx ? " active" : ""}" data-idx="${i}" title="${s.desc}">${s.name === fav ? '<span class="fav-star">★</span>' : ""}<span>${s.name}</span></button>`
+  ).join("");
+}
+
+function setDepth(pct) {
+  const d = pct / 100;
+  if (focusLFO) { focusLFO.min = 1 - d; focusLFO.max = 1; }
+  depthVal.textContent = `${pct}%`;
+}
+function setVol(pct) {
+  if (masterGain) masterGain.gain.rampTo(pct / 100, 0.2);
+  volVal.textContent = `${pct}%`;
+}
+function setMode(m) {
+  mode = m;
+  if (focusLFO) focusLFO.frequency.rampTo(MODES[m].freq, 0.5);
+  metaEl.textContent = `human-curated · ${MODES[m].freq}hz · ${m}`;
+  document.querySelectorAll(".mode").forEach(b => b.classList.toggle("active", b.dataset.mode === m));
+  renderStationList();
+  if (started) playStation(0);
+}
+
+depthEl.addEventListener("input", e => setDepth(+e.target.value));
+volEl.addEventListener("input", e => setVol(+e.target.value));
+modesEl.addEventListener("click", e => { const b = e.target.closest(".mode"); if (b) setMode(b.dataset.mode); });
+stationsEl.addEventListener("click", e => {
+  const b = e.target.closest(".station"); if (!b || !started) return;
+  playStation(+b.dataset.idx);
+});
+skipBtn.addEventListener("click", skipStation);
+dislikeBtn.addEventListener("click", dislikeCurrentStation);
+resetBtn.addEventListener("click", resetAll);
+
+function resetAll() {
+  setMode(DEFAULTS.mode);
+  depthEl.value = DEFAULTS.depth; setDepth(DEFAULTS.depth);
+  volEl.value = DEFAULTS.vol; setVol(DEFAULTS.vol);
+  resetBtn.style.color = "var(--cool)"; resetBtn.style.borderColor = "var(--cool)";
+  setTimeout(() => { resetBtn.style.color = ""; resetBtn.style.borderColor = ""; }, 400);
+}
+
+async function start() {
+  await Tone.start();
+  if (!masterAM) buildGraph();
+  setDepth(+depthEl.value);
+  setVol(+volEl.value);
+  try { if ("wakeLock" in navigator) await navigator.wakeLock.request("screen").catch(() => {}); } catch {}
+
+  started = true;
+  sessionStart = Date.now();
+  currentSessionId = `${sessionStart}_${Math.random().toString(36).slice(2, 7)}`;
+  await playStation(0);
+  startMetaPolling();
+
+  playBtn.textContent = "■ stop session";
+  playBtn.classList.add("playing");
+  pulse.classList.remove("idle");
+  skipBtn.disabled = false;
+  dislikeBtn.disabled = false;
+}
+
+function stop() {
+  if (audioEl) audioEl.pause();
+  if (endTimer) { clearTimeout(endTimer); endTimer = null; }
+  stopMetaPolling();
+  endPlayLog();
+  currentSessionId = null;
+  started = false;
+  playBtn.textContent = "▶ start session";
+  playBtn.classList.remove("playing");
+  pulse.classList.remove("loading");
+  pulse.classList.add("idle");
+  skipBtn.disabled = true;
+  dislikeBtn.disabled = true;
+  statusEl.textContent = "stopped";
+  stationNameEl.textContent = "choose a mode";
+  trackTitleEl.textContent = "—";
+  trackArtistEl.textContent = "—";
+  genreEl.textContent = "press start to begin";
+  renderStationList();
+}
+playBtn.addEventListener("click", () => started ? stop() : start());
+
+// ─── stats ─────────────────────────────────────────────────────────────────
+let statsFilterDays = 0;
+
+function fmtDuration(sec) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+function fmtHour(h) {
+  if (h === undefined || h === null) return "—";
+  const period = h < 12 ? "AM" : "PM";
+  const hh = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${hh} ${period}`;
+}
+
+function computeStats(filterDays) {
+  let filtered = plays;
+  if (filterDays > 0) {
+    const cutoff = Date.now() - filterDays * 24 * 3600 * 1000;
+    filtered = plays.filter(p => p.startMs >= cutoff);
+  }
+  const sessions = new Set(filtered.map(p => p.sessionId)).size;
+  const totalSec = filtered.reduce((a, p) => a + p.durationSec, 0);
+  const days = new Set(filtered.map(p => isoDate(new Date(p.startMs))));
+  const stationsPlayed = new Set(filtered.map(p => p.stationName)).size;
+
+  // Streaks: consecutive days
+  const streak = computeStreaks(days);
+
+  // Peak hour
+  const hourTotals = {};
+  filtered.forEach(p => {
+    const h = new Date(p.startMs).getHours();
+    hourTotals[h] = (hourTotals[h] || 0) + p.durationSec;
+  });
+  const peakHour = Object.entries(hourTotals).sort((a, b) => b[1] - a[1])[0]?.[0];
+
+  // Favorite station
+  const stationTotals = {};
+  filtered.forEach(p => {
+    stationTotals[p.stationName] = (stationTotals[p.stationName] || 0) + p.durationSec;
+  });
+  const favorite = Object.entries(stationTotals).sort((a, b) => b[1] - a[1])[0];
+
+  return {
+    sessions, totalSec, activeDays: days.size, stationsPlayed,
+    currentStreak: streak.current, longestStreak: streak.longest,
+    peakHour: peakHour !== undefined ? +peakHour : null,
+    favoriteStation: favorite ? favorite[0] : null,
+    favoriteStationSec: favorite ? favorite[1] : 0,
+    plays: filtered,
+  };
+}
+
+function isoDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function computeStreaks(daysSet) {
+  if (daysSet.size === 0) return { current: 0, longest: 0 };
+  const sorted = [...daysSet].sort();
+  let longest = 1, run = 1;
+  for (let i = 1; i < sorted.length; i++) {
+    const diff = (new Date(sorted[i]) - new Date(sorted[i - 1])) / (24 * 3600 * 1000);
+    run = diff === 1 ? run + 1 : 1;
+    longest = Math.max(longest, run);
+  }
+  // Current streak: count back from today (or yesterday) while contiguous
+  let current = 0;
+  const today = isoDate(new Date());
+  const yesterday = isoDate(new Date(Date.now() - 24 * 3600 * 1000));
+  if (daysSet.has(today) || daysSet.has(yesterday)) {
+    let cursor = new Date(daysSet.has(today) ? today : yesterday);
+    while (daysSet.has(isoDate(cursor))) {
+      current++;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+  }
+  return { current, longest };
+}
+
+function renderStats() {
+  const s = computeStats(statsFilterDays);
+  const cards = [
+    { label: "Sessions",        value: s.sessions },
+    { label: "Total focus time", value: fmtDuration(s.totalSec), small: true },
+    { label: "Stations played",  value: s.stationsPlayed },
+    { label: "Active days",      value: s.activeDays },
+    { label: "Current streak",   value: `${s.currentStreak}d` },
+    { label: "Longest streak",   value: `${s.longestStreak}d` },
+    { label: "Peak hour",        value: fmtHour(s.peakHour), small: true },
+    { label: "Favorite station", value: s.favoriteStation || "—", small: true },
+  ];
+  statsGrid.innerHTML = cards.map(c =>
+    `<div class="stat-card">
+      <div class="label">${c.label}</div>
+      <div class="value${c.small ? " small" : ""}">${c.value}</div>
+    </div>`
+  ).join("");
+
+  renderHeatmap(s.plays);
+}
+
+function renderHeatmap(playList) {
+  const weeks = 26;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const startDay = new Date(today);
+  // Anchor first column to the Sunday (weeks-1) weeks before this week's Sunday
+  startDay.setDate(startDay.getDate() - today.getDay() - (weeks - 1) * 7);
+
+  const totals = {};
+  playList.forEach(p => {
+    const k = isoDate(new Date(p.startMs));
+    totals[k] = (totals[k] || 0) + p.durationSec;
+  });
+  const maxSec = Math.max(60, ...Object.values(totals));
+
+  const cells = [];
+  for (let col = 0; col < weeks; col++) {
+    for (let row = 0; row < 7; row++) {
+      const d = new Date(startDay);
+      d.setDate(d.getDate() + col * 7 + row);
+      const future = d > today;
+      const k = isoDate(d);
+      const sec = totals[k] || 0;
+      let cls = "c0";
+      if (sec > 0) {
+        const r = sec / maxSec;
+        cls = r > 0.75 ? "c4" : r > 0.5 ? "c3" : r > 0.25 ? "c2" : "c1";
+      }
+      cells.push(
+        `<div class="cell ${cls}${future ? " future" : ""}" title="${k}: ${fmtDuration(sec)}"></div>`
+      );
+    }
+  }
+  if (playList.length === 0) {
+    heatmapEl.innerHTML = `<div class="empty-state">No sessions yet — start a session to begin tracking.</div>`;
+  } else {
+    heatmapEl.innerHTML =
+      `<div class="heatmap" style="grid-template-columns: repeat(${weeks}, 1fr);">${cells.join("")}</div>`;
+  }
+}
+
+function openStats() {
+  renderStats();
+  statsOverlay.hidden = false;
+}
+function closeStats() { statsOverlay.hidden = true; }
+
+statsBtn.addEventListener("click", openStats);
+statsClose.addEventListener("click", closeStats);
+statsOverlay.addEventListener("click", e => { if (e.target === statsOverlay) closeStats(); });
+
+document.querySelectorAll(".filter").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".filter").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    statsFilterDays = +btn.dataset.days;
+    renderStats();
+  });
+});
+
+// ─── theme ─────────────────────────────────────────────────────────────────
+function applyTheme(t) {
+  document.documentElement.setAttribute("data-theme", t);
+  themeToggle.textContent = t === "light" ? "☀" : "☾";
+  saveJSON(LS_THEME, t);
+}
+applyTheme(loadJSON(LS_THEME, "dark"));
+themeToggle.addEventListener("click", () => {
+  const cur = document.documentElement.getAttribute("data-theme");
+  applyTheme(cur === "dark" ? "light" : "dark");
+});
+
+// Initial render
+renderStationList();
+
+// ─── visualizer ────────────────────────────────────────────────────────────
+const canvas = document.getElementById("vis");
+const ctx = canvas.getContext("2d");
+function resizeCanvas() {
+  const r = canvas.getBoundingClientRect();
+  const dpr = devicePixelRatio || 1;
+  canvas.width = r.width * dpr; canvas.height = r.height * dpr;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.scale(dpr, dpr);
+}
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+
+let smoothedWave = null;
+const WAVE_SMOOTHING = 0.82;
+
+function draw() {
+  const r = canvas.getBoundingClientRect();
+  const w = r.width, h = r.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const t = performance.now() / 1000;
+  const breath = (Math.sin(t * 0.2 * 2 * Math.PI) + 1) / 2;
+  const cx = w / 2, cy = h / 2;
+  const isLight = document.documentElement.getAttribute("data-theme") === "light";
+
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) / 1.3);
+  const intensity = started ? 0.07 + breath * 0.04 : 0.04;
+  grad.addColorStop(0, `rgba(${isLight ? "201,56,120" : "255,95,162"}, ${intensity})`);
+  grad.addColorStop(0.5, `rgba(${isLight ? "28,143,181" : "95,225,255"}, ${intensity * 0.5})`);
+  grad.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+
+  if (analyser && started) {
+    const data = analyser.getValue();
+    if (!smoothedWave || smoothedWave.length !== data.length) smoothedWave = new Float32Array(data.length);
+    for (let i = 0; i < data.length; i++) {
+      smoothedWave[i] = smoothedWave[i] * WAVE_SMOOTHING + data[i] * (1 - WAVE_SMOOTHING);
+    }
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = isLight ? `rgba(26,14,46,0.22)` : `rgba(244,236,255,0.22)`;
+    ctx.beginPath();
+    for (let i = 0; i < smoothedWave.length; i++) {
+      const x = (i / smoothedWave.length) * w;
+      const y = cy + smoothedWave[i] * h * 0.18;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  if (started) {
+    ctx.strokeStyle = `rgba(${isLight ? "28,143,181" : "95,225,255"}, ${0.08 + breath * 0.05})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, 110 + breath * 16, 0, 2 * Math.PI); ctx.stroke();
+
+    const station = STATIONS[mode][stationIdx];
+    if (station) {
+      ctx.font = "500 16px ui-monospace, Menlo, monospace";
+      ctx.fillStyle = isLight ? "rgba(26,14,46,0.45)" : "rgba(244,236,255,0.42)";
+      ctx.fillText(station.name, 24, h - 28);
+
+      ctx.font = "10px ui-monospace, Menlo, monospace";
+      ctx.fillStyle = isLight ? "rgba(107,93,140,0.65)" : "rgba(155,134,196,0.5)";
+      const info = trackTitleEl.textContent !== "—" && trackTitleEl.textContent !== "live broadcast"
+        ? `${trackArtistEl.textContent} — ${trackTitleEl.textContent}`
+        : station.desc;
+      ctx.fillText(info.length > 64 ? info.slice(0, 63) + "…" : info, 24, h - 12);
+    }
+  }
+  requestAnimationFrame(draw);
+}
+draw();
+
+// ─── session timer (footer) ────────────────────────────────────────────────
+setInterval(() => {
+  if (!started) return;
+  const s = Math.floor((Date.now() - sessionStart) / 1000);
+  const hh = String(Math.floor(s / 3600)).padStart(2, "0");
+  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  sessionEl.textContent = `${hh}:${mm}:${ss}`;
+}, 500);
+
+// Persist current play periodically so a crash/close doesn't lose data
+setInterval(() => {
+  if (!started || !currentPlayStartMs) return;
+  // Snapshot: end the current play, save, then start a fresh one with same station.
+  // But that would create gaps. Instead just save the running state in a side key.
+  // Simpler: rely on stop/skip events to save. Skip this for now.
+}, 60000);
+
+// On unload, save any open play
+window.addEventListener("beforeunload", () => {
+  if (started) endPlayLog();
+});
+
+document.addEventListener("keydown", e => {
+  const inField = ["INPUT","TEXTAREA"].includes(document.activeElement.tagName);
+  if (e.code === "Space" && !inField) { e.preventDefault(); started ? stop() : start(); }
+  if (e.code === "ArrowRight" && started) skipStation();
+  if (e.code === "Escape" && !statsOverlay.hidden) closeStats();
+});
+</script>
+</body>
+</html>
