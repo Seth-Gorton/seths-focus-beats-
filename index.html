@@ -357,6 +357,10 @@
     letter-spacing: 0.1em; text-transform: uppercase;
     margin-bottom: 8px;
   }
+  .form-group > label .hint {
+    text-transform: none; letter-spacing: 0.04em; opacity: 0.7;
+    font-size: 9px; margin-left: 4px;
+  }
   .form-group input[type=text] {
     width: 100%;
     background: var(--card-bg-2); border: 1px solid var(--card-border-2);
@@ -517,13 +521,8 @@
       </div>
 
       <div class="form-group">
-        <label>what kind of music gets you in the zone?</label>
-        <div class="choice-grid">
-          <button class="choice" data-mode="house">deep house & techno<small>house mode</small></button>
-          <button class="choice" data-mode="focus">electronic & IDM<small>focus mode</small></button>
-          <button class="choice" data-mode="flow">ambient & drone<small>flow mode</small></button>
-          <button class="choice" data-mode="energy">lounge & chillout<small>energy mode</small></button>
-        </div>
+        <label>what gets you in the zone? <span class="hint">(pick any number)</span></label>
+        <div class="choice-grid" id="welcome-choices"></div>
       </div>
 
       <button class="welcome-submit" id="welcome-submit" disabled>begin →</button>
@@ -534,60 +533,82 @@
 "use strict";
 
 // ─── stations ──────────────────────────────────────────────────────────────
+// Single source of truth — all stations keyed by id.
+const STATION_DB = {
+  // SomaFM
+  missioncontrol: { name: "Mission Control",          url: "https://ice1.somafm.com/missioncontrol-128-mp3", desc: "celestial ambient + nasa transmissions" },
+  beatblender:    { name: "Beat Blender",             url: "https://ice1.somafm.com/beatblender-128-mp3",    desc: "downtempo electronic grooves" },
+  cliqhop:        { name: "Cliqhop IDM",              url: "https://ice1.somafm.com/cliqhop-128-mp3",        desc: "blippy electronic, glitchy IDM" },
+  lush:           { name: "Lush",                     url: "https://ice1.somafm.com/lush-128-mp3",           desc: "sensuous mellow vocals + electronica" },
+  dronezone:      { name: "Drone Zone",               url: "https://ice1.somafm.com/dronezone-128-mp3",      desc: "atmospheric ambient drone" },
+  deepspaceone:   { name: "Deep Space One",           url: "https://ice1.somafm.com/deepspaceone-128-mp3",   desc: "deep ambient electronic" },
+  spacestation:   { name: "Space Station",            url: "https://ice1.somafm.com/spacestation-128-mp3",   desc: "spaced-out ambient electronica" },
+  thistle:        { name: "ThistleRadio",             url: "https://ice1.somafm.com/thistle-128-mp3",        desc: "celtic, acoustic, world-folk" },
+  thetrip:        { name: "The Trip",                 url: "https://ice1.somafm.com/thetrip-128-mp3",        desc: "progressive house, trance, late-night" },
+  groovesalad:    { name: "Groove Salad",             url: "https://ice1.somafm.com/groovesalad-128-mp3",    desc: "chilled, ambient grooves" },
+  secretagent:    { name: "Secret Agent",             url: "https://ice1.somafm.com/secretagent-128-mp3",    desc: "spy lounge, bossa, cocktail" },
+  defcon:         { name: "DEF CON Radio",            url: "https://ice1.somafm.com/defcon-128-mp3",         desc: "electronic music for hackers" },
+  u80s:           { name: "Underground 80s",          url: "https://ice1.somafm.com/u80s-128-mp3",           desc: "early 80s new wave & post-punk" },
+  sonicuniverse:  { name: "Sonic Universe",           url: "https://ice1.somafm.com/sonicuniverse-128-mp3",  desc: "transcendental jazz electronica" },
+  earwaves:       { name: "Earwaves",                 url: "https://ice1.somafm.com/earwaves-128-mp3",       desc: "experimental electronica" },
+  vaporwaves:     { name: "Vaporwaves",               url: "https://ice1.somafm.com/vaporwaves-128-mp3",     desc: "vaporwave, future-funk, hauntology" },
+  n5md:           { name: "n5MD Radio",               url: "https://ice1.somafm.com/n5md-128-mp3",           desc: "introspective electronic + post-rock" },
+  suburbsofgoa:   { name: "Suburbs of Goa",           url: "https://ice1.somafm.com/suburbsofgoa-128-mp3",   desc: "global goa-trance, world ambient" },
+  brfm:           { name: "Black Rock FM",            url: "https://ice1.somafm.com/brfm-128-mp3",           desc: "burning man playa vibes" },
+  bossa:          { name: "Bossa Beyond",             url: "https://ice1.somafm.com/bossa-128-mp3",          desc: "lush bossa nova" },
+  poptron:        { name: "PopTron",                  url: "https://ice1.somafm.com/poptron-128-mp3",        desc: "electropop + indie dance" },
+  indiepop:       { name: "Indie Pop Rocks",          url: "https://ice1.somafm.com/indiepop-128-mp3",       desc: "indie pop + alternative" },
+  synphaera:      { name: "Synphaera",                url: "https://ice1.somafm.com/synphaera-128-mp3",      desc: "deep ambient + drone soundscapes" },
+  folkfwd:        { name: "Folk Forward",             url: "https://ice1.somafm.com/folkfwd-128-mp3",        desc: "indie folk + acoustic" },
+  illstreet:      { name: "Illinois Street Lounge",   url: "https://ice1.somafm.com/illstreet-128-mp3",      desc: "classic bachelor-pad lounge + exotica" },
+  // FIP (Radio France)
+  fipelectro:     { name: "FIP Électro",              url: "https://icecast.radiofrance.fr/fipelectro-hifi.aac", desc: "techno, deep house, electronic" },
+  fipgroove:      { name: "FIP Groove",               url: "https://icecast.radiofrance.fr/fipgroove-hifi.aac",  desc: "funk, soul, disco grooves" },
+  fipjazz:        { name: "FIP Jazz",                 url: "https://icecast.radiofrance.fr/fipjazz-hifi.aac",    desc: "jazz, classic + modern" },
+  fippop:         { name: "FIP Pop",                  url: "https://icecast.radiofrance.fr/fippop-hifi.aac",     desc: "pop, indie, eclectic" },
+  fiprock:        { name: "FIP Rock",                 url: "https://icecast.radiofrance.fr/fiprock-hifi.aac",    desc: "rock, alt-rock, indie" },
+  fipreggae:      { name: "FIP Reggae",               url: "https://icecast.radiofrance.fr/fipreggae-hifi.aac",  desc: "reggae, dub, ska" },
+  fiphiphop:      { name: "FIP Hip-Hop",              url: "https://icecast.radiofrance.fr/fiphiphop-hifi.aac",  desc: "hip-hop, rap, lo-fi beats" },
+  // NTS Radio
+  nts1:           { name: "NTS 1",                    url: "https://stream-relay-geo.ntslive.net/stream",       desc: "london's underground — eclectic electronic" },
+  nts2:           { name: "NTS 2",                    url: "https://stream-relay-geo.ntslive.net/stream2",      desc: "more nts — deeper underground" },
+};
+
+// Build a station object from a list of ids
+function pickStations(ids) {
+  return ids.map(id => ({ id, ...STATION_DB[id] })).filter(s => s.name);
+}
+
+// Defaults that ship out-of-the-box (4 active per mode)
 const DEFAULT_STATIONS = {
-  focus: [
-    { name: "Mission Control", id: "missioncontrol", url: "https://ice1.somafm.com/missioncontrol-128-mp3", desc: "celestial ambient + nasa transmissions" },
-    { name: "Beat Blender",    id: "beatblender",    url: "https://ice1.somafm.com/beatblender-128-mp3",    desc: "downtempo electronic grooves" },
-    { name: "Cliqhop IDM",     id: "cliqhop",        url: "https://ice1.somafm.com/cliqhop-128-mp3",        desc: "blippy electronic, glitchy IDM" },
-    { name: "Lush",            id: "lush",           url: "https://ice1.somafm.com/lush-128-mp3",           desc: "sensuous mellow vocals + electronica" },
-  ],
-  flow: [
-    { name: "Drone Zone",      id: "dronezone",      url: "https://ice1.somafm.com/dronezone-128-mp3",      desc: "atmospheric ambient drone" },
-    { name: "Deep Space One",  id: "deepspaceone",   url: "https://ice1.somafm.com/deepspaceone-128-mp3",   desc: "deep ambient electronic" },
-    { name: "Space Station",   id: "spacestation",   url: "https://ice1.somafm.com/spacestation-128-mp3",   desc: "spaced-out ambient electronica" },
-    { name: "ThistleRadio",    id: "thistle",        url: "https://ice1.somafm.com/thistle-128-mp3",        desc: "celtic, acoustic, world-folk" },
-  ],
-  house: [
-    { name: "The Trip",        id: "thetrip",        url: "https://ice1.somafm.com/thetrip-128-mp3",        desc: "progressive house, trance, late-night" },
-    { name: "FIP Électro",     id: "fipelectro",     url: "https://icecast.radiofrance.fr/fipelectro-hifi.aac", desc: "techno, deep house, electronic — radio france" },
-    { name: "NTS 1",           id: "nts1",           url: "https://stream-relay-geo.ntslive.net/stream",    desc: "london's underground — techno, house, eclectic" },
-    { name: "FIP Groove",      id: "fipgroove",      url: "https://icecast.radiofrance.fr/fipgroove-hifi.aac", desc: "funk, soul, disco grooves" },
-  ],
-  energy: [
-    { name: "Groove Salad",    id: "groovesalad",    url: "https://ice1.somafm.com/groovesalad-128-mp3",    desc: "chilled, ambient grooves" },
-    { name: "Secret Agent",    id: "secretagent",    url: "https://ice1.somafm.com/secretagent-128-mp3",    desc: "spy lounge, bossa, cocktail" },
-    { name: "DEF CON Radio",   id: "defcon",         url: "https://ice1.somafm.com/defcon-128-mp3",         desc: "electronic music for hackers" },
-    { name: "Underground 80s", id: "u80s",           url: "https://ice1.somafm.com/u80s-128-mp3",           desc: "early 80s new wave & post-punk" },
-  ],
+  focus:  pickStations(["missioncontrol", "beatblender", "cliqhop", "lush"]),
+  flow:   pickStations(["dronezone", "deepspaceone", "spacestation", "thistle"]),
+  house:  pickStations(["thetrip", "fipelectro", "nts1", "fipgroove"]),
+  energy: pickStations(["groovesalad", "secretagent", "defcon", "u80s"]),
 };
 
 // Replacement pool — pulled from when user dislikes a station.
 const BACKUP_STATIONS = {
-  focus: [
-    { name: "Sonic Universe",  id: "sonicuniverse",  url: "https://ice1.somafm.com/sonicuniverse-128-mp3",  desc: "transcendental jazz electronica" },
-    { name: "Earwaves",        id: "earwaves",       url: "https://ice1.somafm.com/earwaves-128-mp3",       desc: "experimental electronica" },
-    { name: "Vaporwaves",      id: "vaporwaves",     url: "https://ice1.somafm.com/vaporwaves-128-mp3",     desc: "vaporwave, future-funk, hauntology" },
-    { name: "FIP Jazz",        id: "fipjazz",        url: "https://icecast.radiofrance.fr/fipjazz-hifi.aac", desc: "jazz, classic + modern" },
-    { name: "n5MD Radio",      id: "n5md",           url: "https://ice1.somafm.com/n5md-128-mp3",           desc: "introspective electronic & post-rock" },
-  ],
-  flow: [
-    { name: "Suburbs of Goa",  id: "suburbsofgoa",   url: "https://ice1.somafm.com/suburbsofgoa-128-mp3",   desc: "global goa-trance, world ambient" },
-    { name: "Black Rock FM",   id: "brfm",           url: "https://ice1.somafm.com/brfm-128-mp3",           desc: "burning man playa vibes" },
-    { name: "FIP Reggae",      id: "fipreggae",      url: "https://icecast.radiofrance.fr/fipreggae-hifi.aac", desc: "reggae, dub, ska" },
-    { name: "Mission Control", id: "missioncontrol", url: "https://ice1.somafm.com/missioncontrol-128-mp3", desc: "celestial ambient + nasa" },
-  ],
-  house: [
-    { name: "NTS 2",           id: "nts2",           url: "https://stream-relay-geo.ntslive.net/stream2",    desc: "more nts — deeper underground" },
-    { name: "Bossa Beyond",    id: "bossa",          url: "https://ice1.somafm.com/bossa-128-mp3",          desc: "lush bossa nova" },
-    { name: "FIP Pop",         id: "fippop",         url: "https://icecast.radiofrance.fr/fippop-hifi.aac", desc: "pop, indie, eclectic" },
-  ],
-  energy: [
-    { name: "PopTron",         id: "poptron",        url: "https://ice1.somafm.com/poptron-128-mp3",        desc: "electropop & indie dance" },
-    { name: "FIP Rock",        id: "fiprock",        url: "https://icecast.radiofrance.fr/fiprock-hifi.aac", desc: "rock, alt-rock, indie" },
-    { name: "Indie Pop Rocks", id: "indiepop",       url: "https://ice1.somafm.com/indiepop-128-mp3",       desc: "indie pop & alternative" },
-    { name: "FIP Pop",         id: "fippop",         url: "https://icecast.radiofrance.fr/fippop-hifi.aac", desc: "pop, indie, eclectic" },
-  ],
+  focus:  pickStations(["sonicuniverse", "earwaves", "vaporwaves", "fipjazz", "n5md", "fiphiphop"]),
+  flow:   pickStations(["suburbsofgoa", "brfm", "fipreggae", "synphaera", "folkfwd"]),
+  house:  pickStations(["nts2", "bossa", "fippop"]),
+  energy: pickStations(["poptron", "fiprock", "indiepop", "fippop", "illstreet"]),
 };
+
+// Genre tiles shown in the welcome questionnaire — the user picks one or more.
+// Each genre maps to a primary mode and a list of stations to seed that mode.
+const GENRES = [
+  { id: "house",        label: "deep house & techno",  mode: "house",  stations: ["thetrip", "fipelectro", "nts1", "fipgroove"] },
+  { id: "idm",          label: "electronic & IDM",     mode: "focus",  stations: ["cliqhop", "missioncontrol", "beatblender", "n5md"] },
+  { id: "ambient",      label: "ambient & drone",      mode: "flow",   stations: ["dronezone", "deepspaceone", "spacestation", "synphaera"] },
+  { id: "lounge",       label: "lounge & cocktail",    mode: "energy", stations: ["secretagent", "groovesalad", "bossa", "illstreet"] },
+  { id: "jazz",         label: "jazz",                 mode: "focus",  stations: ["fipjazz", "sonicuniverse", "secretagent"] },
+  { id: "hiphop",       label: "hip-hop & lo-fi",      mode: "focus",  stations: ["fiphiphop", "beatblender"] },
+  { id: "world",        label: "world & folk",         mode: "flow",   stations: ["suburbsofgoa", "thistle", "folkfwd", "fipreggae"] },
+  { id: "rock",         label: "rock, indie & 80s",    mode: "energy", stations: ["u80s", "poptron", "indiepop", "fiprock"] },
+  { id: "vocals",       label: "vocals & indie pop",   mode: "focus",  stations: ["lush", "fippop", "indiepop"] },
+  { id: "experimental", label: "experimental",         mode: "focus",  stations: ["earwaves", "vaporwaves", "cliqhop"] },
+];
 
 const MODES = {
   focus:  { freq: 16 },
@@ -1231,7 +1252,7 @@ document.addEventListener("keydown", e => {
 // ─── profile / welcome questionnaire ───────────────────────────────────────
 const welcomeOverlay = document.getElementById("welcome-overlay");
 const welcomeNameInput = document.getElementById("welcome-name");
-const welcomeChoices = document.querySelectorAll(".choice");
+const welcomeChoicesEl = document.getElementById("welcome-choices");
 const welcomeSubmit = document.getElementById("welcome-submit");
 const welcomeClose = document.getElementById("welcome-close");
 const welcomeTitleEl = document.getElementById("welcome-title");
@@ -1239,7 +1260,7 @@ const welcomeSubEl = document.getElementById("welcome-sub");
 const editNameBtn = document.getElementById("edit-name");
 const userNameEl = document.getElementById("user-name");
 
-let welcomePickedMode = null;
+const welcomePickedGenres = new Set(); // genre IDs
 
 function loadProfile() { return loadJSON(LS_PROFILE, null); }
 function applyProfile() {
@@ -1252,51 +1273,115 @@ function applyProfile() {
   }
 }
 
+// Render genre tiles into the welcome modal from the GENRES array.
+function renderWelcomeChoices() {
+  welcomeChoicesEl.innerHTML = GENRES.map(g =>
+    `<button class="choice" data-genre="${g.id}">${g.label}<small>${g.mode} mode</small></button>`
+  ).join("");
+  welcomeChoicesEl.querySelectorAll(".choice").forEach(b => {
+    b.addEventListener("click", () => {
+      const id = b.dataset.genre;
+      if (welcomePickedGenres.has(id)) {
+        welcomePickedGenres.delete(id);
+        b.classList.remove("selected");
+      } else {
+        welcomePickedGenres.add(id);
+        b.classList.add("selected");
+      }
+      updateWelcomeSubmit();
+    });
+  });
+}
+
+// Rebuild STATIONS from a set of selected genres. Each genre seeds its mapped
+// mode with stations from that genre. Modes that don't get any selected genres
+// fall back to defaults. Disliked stations are always excluded.
+function applyGenrePreferences(genreIds) {
+  const dislikedSet = new Set(disliked);
+  const newStations = { focus: [], flow: [], house: [], energy: [] };
+  const seen = { focus: new Set(), flow: new Set(), house: new Set(), energy: new Set() };
+
+  for (const gid of genreIds) {
+    const genre = GENRES.find(g => g.id === gid);
+    if (!genre) continue;
+    const m = genre.mode;
+    for (const sid of genre.stations) {
+      if (dislikedSet.has(sid)) continue;
+      if (seen[m].has(sid)) continue;
+      const def = STATION_DB[sid];
+      if (!def) continue;
+      seen[m].add(sid);
+      newStations[m].push({ id: sid, ...def });
+    }
+  }
+
+  // Modes the user didn't pick anything for — keep defaults so the mode still works
+  for (const m of Object.keys(newStations)) {
+    if (newStations[m].length === 0) {
+      newStations[m] = JSON.parse(JSON.stringify(DEFAULT_STATIONS[m]))
+        .filter(s => !dislikedSet.has(s.id));
+      if (newStations[m].length === 0) {
+        newStations[m] = JSON.parse(JSON.stringify(DEFAULT_STATIONS[m]));
+      }
+    }
+  }
+
+  STATIONS = newStations;
+  saveJSON(LS_STATIONS, STATIONS);
+  renderStationList();
+}
+
 function openWelcome(isEdit) {
   const p = loadProfile();
   welcomeNameInput.value = p?.name || "";
-  welcomePickedMode = p?.preference || null;
-  welcomeChoices.forEach(b =>
-    b.classList.toggle("selected", b.dataset.mode === welcomePickedMode));
+  welcomePickedGenres.clear();
+  // Pre-select previous genres if editing
+  (p?.genres || []).forEach(g => welcomePickedGenres.add(g));
+  welcomeChoicesEl.querySelectorAll(".choice").forEach(b => {
+    b.classList.toggle("selected", welcomePickedGenres.has(b.dataset.genre));
+  });
   welcomeClose.hidden = !isEdit;
   welcomeTitleEl.textContent = isEdit ? "edit profile" : "welcome to focus beats";
   welcomeSubEl.textContent = isEdit
-    ? "update your name or preferred mode."
+    ? "update your name or preferred genres."
     : "a couple of quick questions to set things up.";
   welcomeOverlay.hidden = false;
   updateWelcomeSubmit();
-  // Focus the name field after the overlay paints
   setTimeout(() => welcomeNameInput.focus(), 50);
 }
 function closeWelcome() { welcomeOverlay.hidden = true; }
 function updateWelcomeSubmit() {
-  welcomeSubmit.disabled = !welcomeNameInput.value.trim() || !welcomePickedMode;
+  welcomeSubmit.disabled = !welcomeNameInput.value.trim() || welcomePickedGenres.size === 0;
 }
 
 welcomeNameInput.addEventListener("input", updateWelcomeSubmit);
-welcomeChoices.forEach(b => b.addEventListener("click", () => {
-  welcomeChoices.forEach(bb => bb.classList.remove("selected"));
-  b.classList.add("selected");
-  welcomePickedMode = b.dataset.mode;
-  updateWelcomeSubmit();
-}));
 welcomeSubmit.addEventListener("click", () => {
   const existing = loadProfile();
+  const genres = Array.from(welcomePickedGenres);
+  // Default mode is the mode of the first picked genre
+  const firstGenre = GENRES.find(g => g.id === genres[0]);
+  const defaultMode = firstGenre?.mode || "focus";
+
   saveJSON(LS_PROFILE, {
     name: welcomeNameInput.value.trim().slice(0, 30),
-    preference: welcomePickedMode,
+    genres,
+    preference: defaultMode,
     createdAt: existing?.createdAt || Date.now(),
     updatedAt: Date.now(),
   });
+  applyGenrePreferences(genres);
   applyProfile();
+  setMode(defaultMode);
   closeWelcome();
 });
 welcomeClose.addEventListener("click", closeWelcome);
 welcomeOverlay.addEventListener("click", e => {
-  // Only the backdrop closes — and only if user already has a profile (edit mode)
   if (e.target === welcomeOverlay && !welcomeClose.hidden) closeWelcome();
 });
 editNameBtn.addEventListener("click", () => openWelcome(true));
+
+// Render the choice tiles before anyone can open the modal
+renderWelcomeChoices();
 
 // On load: show welcome if no profile, otherwise apply the existing one
 if (loadProfile()) applyProfile();
