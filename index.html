@@ -623,6 +623,7 @@ const LS_STATIONS = "focusbeats:stations";    // user's active station list (aft
 const LS_DISLIKED = "focusbeats:disliked";    // ids of stations the user disliked
 const LS_THEME    = "focusbeats:theme";
 const LS_PROFILE  = "focusbeats:profile";     // { name, preference, createdAt }
+const LS_PREFS    = "focusbeats:prefs";       // last-session state: { mode, volume, depth, stationIdxByMode, lastSessionEndMs }
 
 function loadJSON(key, fallback) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
@@ -659,6 +660,10 @@ let sessionStart = 0;
 let stationIdx = 0;
 let endTimer = null;
 let metaTimer = null;
+// Per-mode "last station you were on" — restored on next start
+const stationIdxByMode = { focus: 0, flow: 0, house: 0, energy: 0 };
+// Debounce timer for savePrefs on slider drags
+let prefsSaveTimer = null;
 
 // Current play being tracked (for session log)
 let currentSessionId = null;
@@ -735,6 +740,8 @@ async function playStation(idx) {
     return;
   }
   stationIdx = ((idx % list.length) + list.length) % list.length;
+  stationIdxByMode[mode] = stationIdx;
+  savePrefs();
   const s = list[stationIdx];
 
   audioEl.src = s.url;
@@ -887,11 +894,13 @@ function setMode(m) {
   metaEl.textContent = `human-curated · ${MODES[m].freq}hz · ${m}`;
   document.querySelectorAll(".mode").forEach(b => b.classList.toggle("active", b.dataset.mode === m));
   renderStationList();
-  if (started) playStation(0);
+  // When changing modes mid-session, resume on the station you were last on in that mode
+  if (started) playStation(stationIdxByMode[m] || 0);
+  savePrefs();
 }
 
-depthEl.addEventListener("input", e => setDepth(+e.target.value));
-volEl.addEventListener("input", e => setVol(+e.target.value));
+depthEl.addEventListener("input", e => { setDepth(+e.target.value); savePrefsDebounced(); });
+volEl.addEventListener("input", e => { setVol(+e.target.value); savePrefsDebounced(); });
 modesEl.addEventListener("click", e => { const b = e.target.closest(".mode"); if (b) setMode(b.dataset.mode); });
 stationsEl.addEventListener("click", e => {
   const b = e.target.closest(".station"); if (!b || !started) return;
@@ -919,7 +928,8 @@ async function start() {
   started = true;
   sessionStart = Date.now();
   currentSessionId = `${sessionStart}_${Math.random().toString(36).slice(2, 7)}`;
-  await playStation(0);
+  // Resume on the station the user had last in this mode (or 0 if first time)
+  await playStation(stationIdxByMode[mode] || 0);
   startMetaPolling();
 
   playBtn.textContent = "■ stop session";
@@ -948,6 +958,8 @@ function stop() {
   trackArtistEl.textContent = "—";
   genreEl.textContent = "press start to begin";
   renderStationList();
+  // Persist the end-of-session state so the next visit can show "X ago"
+  savePrefs();
 }
 playBtn.addEventListener("click", () => started ? stop() : start());
 
@@ -1273,6 +1285,48 @@ function applyProfile() {
   }
 }
 
+// ─── last-session persistence ─────────────────────────────────────────────
+function savePrefs() {
+  saveJSON(LS_PREFS, {
+    mode,
+    volume: +volEl.value,
+    depth: +depthEl.value,
+    stationIdxByMode: { ...stationIdxByMode },
+    lastSessionEndMs: started ? null : Date.now(),
+  });
+}
+function savePrefsDebounced() {
+  if (prefsSaveTimer) clearTimeout(prefsSaveTimer);
+  prefsSaveTimer = setTimeout(savePrefs, 400);
+}
+function restoreLastSessionPrefs() {
+  const p = loadJSON(LS_PREFS, null);
+  if (!p) return;
+  if (p.stationIdxByMode) {
+    Object.assign(stationIdxByMode, p.stationIdxByMode);
+  }
+  // Mode override (after profile applied default — prefs win since they reflect
+  // what the user was actually doing last)
+  if (p.mode && MODES[p.mode]) setMode(p.mode);
+  if (typeof p.volume === "number") {
+    volEl.value = p.volume; setVol(p.volume);
+  }
+  if (typeof p.depth === "number") {
+    depthEl.value = p.depth; setDepth(p.depth);
+  }
+  // Show a friendly "last session X ago" hint while stopped
+  if (p.lastSessionEndMs) {
+    genreEl.textContent = `last session ${timeAgo(p.lastSessionEndMs)} · press start`;
+  }
+}
+function timeAgo(ts) {
+  const diff = Date.now() - ts;
+  if (diff < 60_000) return "just now";
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+  return `${Math.floor(diff / 86_400_000)}d ago`;
+}
+
 // Render genre tiles into the welcome modal from the GENRES array.
 function renderWelcomeChoices() {
   welcomeChoicesEl.innerHTML = GENRES.map(g =>
@@ -1383,9 +1437,14 @@ editNameBtn.addEventListener("click", () => openWelcome(true));
 // Render the choice tiles before anyone can open the modal
 renderWelcomeChoices();
 
-// On load: show welcome if no profile, otherwise apply the existing one
-if (loadProfile()) applyProfile();
-else openWelcome(false);
+// On load: show welcome if no profile, otherwise apply existing profile
+// AND restore the last session's mode / volume / focus depth / station index.
+if (loadProfile()) {
+  applyProfile();
+  restoreLastSessionPrefs();
+} else {
+  openWelcome(false);
+}
 </script>
 </body>
 </html>
