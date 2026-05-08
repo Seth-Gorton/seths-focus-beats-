@@ -315,6 +315,90 @@
     padding: 40px 20px; font-size: 12px;
   }
 
+  /* ─── edit-name pencil + welcome modal ─── */
+  .edit-name {
+    appearance: none; cursor: pointer;
+    background: transparent; border: 0;
+    color: var(--dim); font-size: 12px;
+    padding: 0 4px; margin-left: 4px; line-height: 1;
+    transition: color 0.15s;
+  }
+  .edit-name:hover { color: var(--ink); }
+
+  .welcome-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(10,6,18,0.86);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    display: flex; align-items: center; justify-content: center; padding: 32px;
+  }
+  [data-theme="light"] .welcome-overlay { background: rgba(246,242,252,0.9); }
+  .welcome-overlay[hidden] { display: none; }
+
+  .welcome-panel {
+    width: 100%; max-width: 460px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 28px 30px;
+    position: relative;
+  }
+  .welcome-panel h2 {
+    margin: 0 0 6px 0; font-size: 18px; font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .welcome-sub {
+    margin: 0 0 22px 0; font-size: 12px; color: var(--dim);
+  }
+  .welcome-panel .close { position: absolute; top: 12px; right: 14px; }
+
+  .form-group { margin-bottom: 18px; }
+  .form-group > label {
+    display: block; font-size: 10px; color: var(--dim);
+    letter-spacing: 0.1em; text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .form-group input[type=text] {
+    width: 100%;
+    background: var(--card-bg-2); border: 1px solid var(--card-border-2);
+    color: var(--ink); padding: 11px 14px; border-radius: 8px;
+    font-family: inherit; font-size: 13px; outline: none;
+    transition: border-color 0.15s;
+  }
+  .form-group input[type=text]:focus { border-color: var(--cool); }
+
+  .choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .choice {
+    appearance: none; cursor: pointer;
+    background: var(--card-bg-2); border: 1px solid var(--card-border-2);
+    color: var(--dim);
+    padding: 12px 12px; border-radius: 9px;
+    font-family: inherit; font-size: 11px; letter-spacing: 0.04em;
+    transition: all 0.15s; text-align: left;
+  }
+  .choice:hover { color: var(--ink); }
+  .choice.selected {
+    background: rgba(255,95,162,0.15); border-color: var(--hot); color: var(--ink);
+  }
+  .choice small {
+    display: block; opacity: 0.55; font-size: 8px;
+    margin-top: 4px; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+
+  .welcome-submit {
+    appearance: none; border: 0; cursor: pointer;
+    width: 100%;
+    background: linear-gradient(135deg, var(--hot), var(--cool));
+    color: #0a0612;
+    font-family: inherit; font-weight: 700; font-size: 13px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 14px; border-radius: 10px;
+    transition: opacity 0.2s, transform 0.1s, filter 0.2s;
+    margin-top: 6px;
+  }
+  .welcome-submit:disabled { opacity: 0.35; cursor: not-allowed; }
+  .welcome-submit:hover:not(:disabled) { filter: brightness(1.1); }
+  .welcome-submit:active:not(:disabled) { transform: scale(0.98); }
+
   @media (max-width: 800px) {
     main { grid-template-columns: 1fr; }
     .vis { display: none; }
@@ -325,7 +409,7 @@
 <body>
   <div class="stage">
     <header>
-      <h1>seth's<span class="dot">·</span>focus<span class="dot">·</span>beats</h1>
+      <h1><span id="user-name">your</span>'s<span class="dot">·</span>focus<span class="dot">·</span>beats <button class="edit-name" id="edit-name" title="edit profile">✎</button></h1>
       <div class="header-right">
         <div class="meta" id="meta">human-curated · 16hz · ready</div>
         <button class="theme-toggle" id="theme-toggle" title="toggle light/dark">☾</button>
@@ -420,6 +504,32 @@
     </div>
   </div>
 
+  <!-- ───── welcome / profile setup ───── -->
+  <div class="welcome-overlay" id="welcome-overlay" hidden>
+    <div class="welcome-panel">
+      <button class="close" id="welcome-close" hidden>×</button>
+      <h2 id="welcome-title">welcome to focus beats</h2>
+      <p class="welcome-sub" id="welcome-sub">a couple of quick questions to set things up.</p>
+
+      <div class="form-group">
+        <label for="welcome-name">your name</label>
+        <input type="text" id="welcome-name" placeholder="seth" maxlength="30" autocomplete="off" />
+      </div>
+
+      <div class="form-group">
+        <label>what kind of music gets you in the zone?</label>
+        <div class="choice-grid">
+          <button class="choice" data-mode="house">deep house & techno<small>house mode</small></button>
+          <button class="choice" data-mode="focus">electronic & IDM<small>focus mode</small></button>
+          <button class="choice" data-mode="flow">ambient & drone<small>flow mode</small></button>
+          <button class="choice" data-mode="energy">lounge & chillout<small>energy mode</small></button>
+        </div>
+      </div>
+
+      <button class="welcome-submit" id="welcome-submit" disabled>begin →</button>
+    </div>
+  </div>
+
 <script>
 "use strict";
 
@@ -429,47 +539,53 @@ const DEFAULT_STATIONS = {
     { name: "Mission Control", id: "missioncontrol", url: "https://ice1.somafm.com/missioncontrol-128-mp3", desc: "celestial ambient + nasa transmissions" },
     { name: "Beat Blender",    id: "beatblender",    url: "https://ice1.somafm.com/beatblender-128-mp3",    desc: "downtempo electronic grooves" },
     { name: "Cliqhop IDM",     id: "cliqhop",        url: "https://ice1.somafm.com/cliqhop-128-mp3",        desc: "blippy electronic, glitchy IDM" },
+    { name: "Lush",            id: "lush",           url: "https://ice1.somafm.com/lush-128-mp3",           desc: "sensuous mellow vocals + electronica" },
   ],
   flow: [
     { name: "Drone Zone",      id: "dronezone",      url: "https://ice1.somafm.com/dronezone-128-mp3",      desc: "atmospheric ambient drone" },
     { name: "Deep Space One",  id: "deepspaceone",   url: "https://ice1.somafm.com/deepspaceone-128-mp3",   desc: "deep ambient electronic" },
     { name: "Space Station",   id: "spacestation",   url: "https://ice1.somafm.com/spacestation-128-mp3",   desc: "spaced-out ambient electronica" },
+    { name: "ThistleRadio",    id: "thistle",        url: "https://ice1.somafm.com/thistle-128-mp3",        desc: "celtic, acoustic, world-folk" },
   ],
   house: [
-    { name: "The Trip",        id: "thetrip",        url: "https://ice1.somafm.com/thetrip-128-mp3",        desc: "progressive house, trance, late-night cosmic" },
+    { name: "The Trip",        id: "thetrip",        url: "https://ice1.somafm.com/thetrip-128-mp3",        desc: "progressive house, trance, late-night" },
     { name: "FIP Électro",     id: "fipelectro",     url: "https://icecast.radiofrance.fr/fipelectro-hifi.aac", desc: "techno, deep house, electronic — radio france" },
     { name: "NTS 1",           id: "nts1",           url: "https://stream-relay-geo.ntslive.net/stream",    desc: "london's underground — techno, house, eclectic" },
+    { name: "FIP Groove",      id: "fipgroove",      url: "https://icecast.radiofrance.fr/fipgroove-hifi.aac", desc: "funk, soul, disco grooves" },
   ],
   energy: [
     { name: "Groove Salad",    id: "groovesalad",    url: "https://ice1.somafm.com/groovesalad-128-mp3",    desc: "chilled, ambient grooves" },
     { name: "Secret Agent",    id: "secretagent",    url: "https://ice1.somafm.com/secretagent-128-mp3",    desc: "spy lounge, bossa, cocktail" },
     { name: "DEF CON Radio",   id: "defcon",         url: "https://ice1.somafm.com/defcon-128-mp3",         desc: "electronic music for hackers" },
+    { name: "Underground 80s", id: "u80s",           url: "https://ice1.somafm.com/u80s-128-mp3",           desc: "early 80s new wave & post-punk" },
   ],
 };
 
 // Replacement pool — pulled from when user dislikes a station.
 const BACKUP_STATIONS = {
   focus: [
-    { name: "Lush",            id: "lush",           url: "https://ice1.somafm.com/lush-128-mp3",           desc: "sensuous, mellow vocals + electronica" },
     { name: "Sonic Universe",  id: "sonicuniverse",  url: "https://ice1.somafm.com/sonicuniverse-128-mp3",  desc: "transcendental jazz electronica" },
     { name: "Earwaves",        id: "earwaves",       url: "https://ice1.somafm.com/earwaves-128-mp3",       desc: "experimental electronica" },
     { name: "Vaporwaves",      id: "vaporwaves",     url: "https://ice1.somafm.com/vaporwaves-128-mp3",     desc: "vaporwave, future-funk, hauntology" },
+    { name: "FIP Jazz",        id: "fipjazz",        url: "https://icecast.radiofrance.fr/fipjazz-hifi.aac", desc: "jazz, classic + modern" },
+    { name: "n5MD Radio",      id: "n5md",           url: "https://ice1.somafm.com/n5md-128-mp3",           desc: "introspective electronic & post-rock" },
   ],
   flow: [
     { name: "Suburbs of Goa",  id: "suburbsofgoa",   url: "https://ice1.somafm.com/suburbsofgoa-128-mp3",   desc: "global goa-trance, world ambient" },
     { name: "Black Rock FM",   id: "brfm",           url: "https://ice1.somafm.com/brfm-128-mp3",           desc: "burning man playa vibes" },
-    { name: "Mystic Soundz",   id: "n5md",           url: "https://ice1.somafm.com/n5md-128-mp3",           desc: "introspective electronic & post-rock" },
-    { name: "ThistleRadio",    id: "thistle",        url: "https://ice1.somafm.com/thistle-128-mp3",        desc: "celtic, acoustic, world-folk" },
+    { name: "FIP Reggae",      id: "fipreggae",      url: "https://icecast.radiofrance.fr/fipreggae-hifi.aac", desc: "reggae, dub, ska" },
+    { name: "Mission Control", id: "missioncontrol", url: "https://ice1.somafm.com/missioncontrol-128-mp3", desc: "celestial ambient + nasa" },
   ],
   house: [
-    { name: "FIP Groove",      id: "fipgroove",      url: "https://icecast.radiofrance.fr/fipgroove-hifi.aac", desc: "funk, soul, disco grooves" },
     { name: "NTS 2",           id: "nts2",           url: "https://stream-relay-geo.ntslive.net/stream2",    desc: "more nts — deeper underground" },
     { name: "Bossa Beyond",    id: "bossa",          url: "https://ice1.somafm.com/bossa-128-mp3",          desc: "lush bossa nova" },
+    { name: "FIP Pop",         id: "fippop",         url: "https://icecast.radiofrance.fr/fippop-hifi.aac", desc: "pop, indie, eclectic" },
   ],
   energy: [
-    { name: "Underground 80s", id: "u80s",           url: "https://ice1.somafm.com/u80s-128-mp3",           desc: "early 80s new wave & post-punk" },
-    { name: "FIP Pop",         id: "fippop",         url: "https://icecast.radiofrance.fr/fippop-hifi.aac", desc: "pop, indie, eclectic — radio france" },
     { name: "PopTron",         id: "poptron",        url: "https://ice1.somafm.com/poptron-128-mp3",        desc: "electropop & indie dance" },
+    { name: "FIP Rock",        id: "fiprock",        url: "https://icecast.radiofrance.fr/fiprock-hifi.aac", desc: "rock, alt-rock, indie" },
+    { name: "Indie Pop Rocks", id: "indiepop",       url: "https://ice1.somafm.com/indiepop-128-mp3",       desc: "indie pop & alternative" },
+    { name: "FIP Pop",         id: "fippop",         url: "https://icecast.radiofrance.fr/fippop-hifi.aac", desc: "pop, indie, eclectic" },
   ],
 };
 
@@ -485,6 +601,7 @@ const LS_PLAYS    = "focusbeats:plays";       // session/play log
 const LS_STATIONS = "focusbeats:stations";    // user's active station list (after dislikes)
 const LS_DISLIKED = "focusbeats:disliked";    // ids of stations the user disliked
 const LS_THEME    = "focusbeats:theme";
+const LS_PROFILE  = "focusbeats:profile";     // { name, preference, createdAt }
 
 function loadJSON(key, fallback) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
@@ -493,8 +610,26 @@ function loadJSON(key, fallback) {
 function saveJSON(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 
 let plays    = loadJSON(LS_PLAYS, []);
-let STATIONS = loadJSON(LS_STATIONS, null) || JSON.parse(JSON.stringify(DEFAULT_STATIONS));
 let disliked = loadJSON(LS_DISLIKED, []);
+
+// Merge stored stations with the latest defaults — so when we ship new stations
+// existing users gain access too (without losing their dislikes).
+function mergeStationsWithDefaults() {
+  const stored = loadJSON(LS_STATIONS, null);
+  const dislikedSet = new Set(disliked);
+  const result = stored ? JSON.parse(JSON.stringify(stored)) : {};
+  for (const m of Object.keys(DEFAULT_STATIONS)) {
+    if (!result[m]) result[m] = [];
+    const haveIds = new Set(result[m].map(s => s.id));
+    for (const def of DEFAULT_STATIONS[m]) {
+      if (!haveIds.has(def.id) && !dislikedSet.has(def.id)) {
+        result[m].push(def);
+      }
+    }
+  }
+  return result;
+}
+let STATIONS = mergeStationsWithDefaults();
 
 // ─── runtime state ─────────────────────────────────────────────────────────
 let mode = "focus";
@@ -1072,12 +1207,100 @@ window.addEventListener("beforeunload", () => {
   if (started) endPlayLog();
 });
 
+// Keyboard shortcuts. Importantly: never act when a modal is open or when
+// focus is on a button/input — that's what was causing the "starts by itself"
+// bug (Space on a focused play button was firing the shortcut AND the button).
 document.addEventListener("keydown", e => {
-  const inField = ["INPUT","TEXTAREA"].includes(document.activeElement.tagName);
-  if (e.code === "Space" && !inField) { e.preventDefault(); started ? stop() : start(); }
-  if (e.code === "ArrowRight" && started) skipStation();
-  if (e.code === "Escape" && !statsOverlay.hidden) closeStats();
+  const tag = document.activeElement && document.activeElement.tagName;
+  const inControl = ["INPUT","TEXTAREA","BUTTON","SELECT"].includes(tag);
+
+  // Welcome modal blocks everything except form interaction.
+  if (!welcomeOverlay.hidden) return;
+
+  // Stats modal: only listen for Escape, ignore the rest.
+  if (!statsOverlay.hidden) {
+    if (e.code === "Escape") closeStats();
+    return;
+  }
+
+  if (inControl) return;
+  if (e.code === "Space")      { e.preventDefault(); started ? stop() : start(); }
+  if (e.code === "ArrowRight") { if (started) skipStation(); }
 });
+
+// ─── profile / welcome questionnaire ───────────────────────────────────────
+const welcomeOverlay = document.getElementById("welcome-overlay");
+const welcomeNameInput = document.getElementById("welcome-name");
+const welcomeChoices = document.querySelectorAll(".choice");
+const welcomeSubmit = document.getElementById("welcome-submit");
+const welcomeClose = document.getElementById("welcome-close");
+const welcomeTitleEl = document.getElementById("welcome-title");
+const welcomeSubEl = document.getElementById("welcome-sub");
+const editNameBtn = document.getElementById("edit-name");
+const userNameEl = document.getElementById("user-name");
+
+let welcomePickedMode = null;
+
+function loadProfile() { return loadJSON(LS_PROFILE, null); }
+function applyProfile() {
+  const p = loadProfile();
+  const name = (p?.name || "your").slice(0, 30);
+  userNameEl.textContent = name;
+  document.title = `${name}'s focus beats`;
+  if (p?.preference && MODES[p.preference] && !started) {
+    setMode(p.preference);
+  }
+}
+
+function openWelcome(isEdit) {
+  const p = loadProfile();
+  welcomeNameInput.value = p?.name || "";
+  welcomePickedMode = p?.preference || null;
+  welcomeChoices.forEach(b =>
+    b.classList.toggle("selected", b.dataset.mode === welcomePickedMode));
+  welcomeClose.hidden = !isEdit;
+  welcomeTitleEl.textContent = isEdit ? "edit profile" : "welcome to focus beats";
+  welcomeSubEl.textContent = isEdit
+    ? "update your name or preferred mode."
+    : "a couple of quick questions to set things up.";
+  welcomeOverlay.hidden = false;
+  updateWelcomeSubmit();
+  // Focus the name field after the overlay paints
+  setTimeout(() => welcomeNameInput.focus(), 50);
+}
+function closeWelcome() { welcomeOverlay.hidden = true; }
+function updateWelcomeSubmit() {
+  welcomeSubmit.disabled = !welcomeNameInput.value.trim() || !welcomePickedMode;
+}
+
+welcomeNameInput.addEventListener("input", updateWelcomeSubmit);
+welcomeChoices.forEach(b => b.addEventListener("click", () => {
+  welcomeChoices.forEach(bb => bb.classList.remove("selected"));
+  b.classList.add("selected");
+  welcomePickedMode = b.dataset.mode;
+  updateWelcomeSubmit();
+}));
+welcomeSubmit.addEventListener("click", () => {
+  const existing = loadProfile();
+  saveJSON(LS_PROFILE, {
+    name: welcomeNameInput.value.trim().slice(0, 30),
+    preference: welcomePickedMode,
+    createdAt: existing?.createdAt || Date.now(),
+    updatedAt: Date.now(),
+  });
+  applyProfile();
+  closeWelcome();
+});
+welcomeClose.addEventListener("click", closeWelcome);
+welcomeOverlay.addEventListener("click", e => {
+  // Only the backdrop closes — and only if user already has a profile (edit mode)
+  if (e.target === welcomeOverlay && !welcomeClose.hidden) closeWelcome();
+});
+editNameBtn.addEventListener("click", () => openWelcome(true));
+
+// On load: show welcome if no profile, otherwise apply the existing one
+if (loadProfile()) applyProfile();
+else openWelcome(false);
 </script>
 </body>
 </html>
